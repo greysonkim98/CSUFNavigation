@@ -205,9 +205,14 @@ class CampusNavigationApp:
         self.time_label = ttk.Label(left_frame, text="Time: ")
         self.time_label.pack(pady=5)
 
-        # Text widget to display the node path order
-        self.path_display = tk.Text(left_frame, height=10, width=25, state=tk.NORMAL)
-        self.path_display.pack(pady=5)
+        # Scrollable text widget to display the node path order
+        path_display_frame = ttk.Frame(left_frame)
+        path_display_frame.pack(pady=5, fill=tk.BOTH, expand=True)
+        self.path_display_scrollbar = ttk.Scrollbar(path_display_frame, orient=tk.VERTICAL)
+        self.path_display = tk.Text(path_display_frame, height=10, width=25, yscrollcommand=self.path_display_scrollbar.set, wrap=tk.WORD)
+        self.path_display_scrollbar.config(command=self.path_display.yview)
+        self.path_display_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.path_display.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         # Right frame for map
         self.map_frame = ttk.Frame(main_frame)
