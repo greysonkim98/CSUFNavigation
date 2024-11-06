@@ -279,7 +279,7 @@ class CampusNavigationApp:
                         self.blocked_nodes.remove(node)
                     else:
                         self.blocked_nodes.add(node)
-                    self.draw_map()  # Redraw the map to show changes in blocked nodes
+                    self.draw_map()
                     break
         elif self.selection_mode in ['from', 'to']:
             for node, pos in self.node_positions.items():
@@ -289,7 +289,7 @@ class CampusNavigationApp:
                     else:
                         self.end_node.set(node)
                     self.selection_mode = None
-                    self.draw_map()  # Redraw to highlight selected nodes
+                    self.draw_map()
                     break
 
     def on_window_resize(self, event):
@@ -338,110 +338,81 @@ class CampusNavigationApp:
             if node not in visited or len(path) <= min_length:
                 neighbors = list(self.neighbors(node))
                 for neighbor in neighbors:
-                    if neighbor not in self.blocked_nodes:
-                        new_path = list(path)
-                        new_path.append(neighbor)
-                        queue.append(new_path)
-                        if neighbor == goal:
-                            if len(new_path) < min_length:
-                                min_length = len(new_path)
-                                paths = [new_path]
-                            elif len(new_path) == min_length:
-                                paths.append(new_path)
+                    new_path = list(path)
+                    new_path.append(neighbor)
+                    queue.append(new_path)
+
+                    if neighbor == goal:
+                        if len(new_path) < min_length:
+                            min_length = len(new_path)
+                            paths = [new_path]
+                        elif len(new_path) == min_length:
+                            paths.append(new_path)
+
                 visited.add(node)
+
         return paths
-        
-    def run_bfs(self, graph, start, goal):
-        queue = [(start, [start])]
-        visited = set()
-        paths = []
 
-        while queue:
-            (node, path) = queue.pop(0)
-            if node not in visited:
-                if node == goal:
-                    paths.append(path)
-                visited.add(node)
-                for neighbor in graph.neighbors(node):
-                    if neighbor not in visited and neighbor not in self.blocked_nodes:
-                        queue.append((neighbor, path + [neighbor]))
-
-        self.display_paths_threaded(paths)
-        self.draw_top_five_longest_paths(paths)
-        
-    def run_dfs_multithreaded(self, graph, start, goal):
-        num_threads = 5
-        paths = []
-        threads = []
+    def dfs_algorithm_threaded(self, graph, start, goal):
+        all_paths = []
         lock = threading.Lock()
 
-        def dfs_thread(start_node, goal_node, path, visited):
-            stack = [(start_node, path)]
-            while stack:
-                (node, path) = stack.pop()
-                if node == goal_node:
-                    with lock:
-                        paths.append(path)
-                    continue
-                if node not in visited:
-                    visited.add(node)
-                    for neighbor in graph.neighbors(node):
-                        if neighbor not in visited and neighbor not in self.blocked_nodes:
-                            stack.append((neighbor, path + [neighbor]))
+        def dfs(current_node, path, visited, thread_paths):
+            if current_node == goal:
+                with lock:
+                    thread_paths.append(list(path))
+                if len(thread_paths) >= 3:
+                    return
 
-        for i in range(num_threads):
-            thread = threading.Thread(target=dfs_thread, args=(start, goal, [start], set()))
+            visited.add(current_node)
+            for neighbor in self.neighbors(current_node):
+                if neighbor not in visited:
+                    new_path = path + [neighbor]
+                    dfs(neighbor, new_path, visited.copy(), thread_paths)
+                    if len(thread_paths) >= 3:
+                        return
+
+        threads = []
+        thread_results = []
+
+        for neighbor in self.neighbors(start):
+            thread_paths = []
+            thread = threading.Thread(target=dfs, args=(neighbor, [start, neighbor], set([start]), thread_paths))
             threads.append(thread)
+            thread_results.append(thread_paths)
             thread.start()
 
         for thread in threads:
             thread.join()
 
-        self.display_paths_threaded(paths)
-        self.draw_top_five_longest_paths(paths)
-    
-    def draw_paths_on_map(self, paths, colors):
-        # Draw all paths
-        for i, path in enumerate(paths):
-            color = colors[i % len(colors)]
-            for j in range(len(path) - 1):
-                start_node = path[j]
-                end_node = path[j + 1]
+        for paths in thread_results:
+            all_paths.extend(paths)
 
-                if start_node in self.node_positions and end_node in self.node_positions:
-                    start_pos = self.node_positions[start_node]
-                    end_pos = self.node_positions[end_node]
-                    self.canvas.create_line(start_pos[0], start_pos[1], end_pos[0], end_pos[1], fill=color, width=3)
+        longest_path = max(all_paths, key=len) if all_paths else []
+        return [longest_path]
 
-    
-    def draw_top_five_longest_paths(self, paths):
-        # Sort paths by length in descending order
-        sorted_paths = sorted(paths, key=len, reverse=True)
-        top_five_paths = sorted_paths[:5]
-        colors = ["#FF6347", "#4682B4", "#32CD32", "#FFD700", "#4B0082"]  # Colors for the top five paths
+    def dfs_algorithm_threaded(self, graph, start, goal):
+        # Use a separate thread to run DFS to avoid blocking the UI
+        thread = threading.Thread(target=self._run_dfs, args=(graph, start, goal))
+        thread.start()
 
-        # Draw the top five longest paths
-        for i, path in enumerate(top_five_paths):
-            color = colors[i % len(colors)]
-            for j in range(len(path) - 1):
-                start_node = path[j]
-                end_node = path[j + 1]
+    def _run_dfs(self, graph, start, goal):
+        stack = [(start, [start])]
+        all_paths = []
+        visited = set()
 
-                if start_node in self.node_positions and end_node in self.node_positions:
-                    start_pos = self.node_positions[start_node]
-                    end_pos = self.node_positions[end_node]
-                    self.canvas.create_line(start_pos[0], start_pos[1], end_pos[0], end_pos[1], fill=color, width=4)
-        for i, path in enumerate(paths):
-            color = colors[i % len(colors)]
-            for j in range(len(path) - 1):
-                start_node = path[j]
-                end_node = path[j + 1]
+        while stack:
+            (vertex, path) = stack.pop()
+            if vertex == goal:
+                all_paths.append(path)
+            else:
+                if vertex not in visited:
+                    visited.add(vertex)
+                    for neighbor in self.neighbors(vertex):
+                        if neighbor not in path:
+                            stack.append((neighbor, path + [neighbor]))
 
-                if start_node in self.node_positions and end_node in self.node_positions:
-                    start_pos = self.node_positions[start_node]
-                    end_pos = self.node_positions[end_node]
-                    self.canvas.create_line(start_pos[0], start_pos[1], end_pos[0], end_pos[1], fill=color, width=3)
-
+        self.display_paths_threaded(all_paths)
 
     def dijkstra_algorithm(self, graph, start, goal):
         shortest_paths = {start: (None, 0)}
@@ -450,21 +421,19 @@ class CampusNavigationApp:
 
         while current_node != goal:
             visited.add(current_node)
-            destinations = list(graph.neighbors(current_node))
+            destinations = self.neighbors(current_node)
             weight_to_current_node = shortest_paths[current_node][1]
 
             for next_node in destinations:
-                if next_node not in visited and next_node not in self.blocked_nodes:
-                    if next_node in graph[current_node]:
-                        weight = graph[current_node][next_node].get('weight', float('inf')) + weight_to_current_node
-                        if next_node not in shortest_paths:
-                            shortest_paths[next_node] = (current_node, weight)
-                        else:
-                            current_shortest_weight = shortest_paths[next_node][1]
-                            if current_shortest_weight > weight:
-                                shortest_paths[next_node] = (current_node, weight)
+                weight = graph[current_node][next_node]['weight'] + weight_to_current_node
+                if next_node not in shortest_paths:
+                    shortest_paths[next_node] = (current_node, weight)
+                else:
+                    current_shortest_weight = shortest_paths[next_node][1]
+                    if current_shortest_weight > weight:
+                        shortest_paths[next_node] = (current_node, weight)
 
-            next_destinations = {node: shortest_paths[node] for node in shortest_paths if node not in visited and node not in self.blocked_nodes}
+            next_destinations = {node: shortest_paths[node] for node in shortest_paths if node not in visited}
             if not next_destinations:
                 return None
             current_node = min(next_destinations, key=lambda k: next_destinations[k][1])
@@ -488,14 +457,7 @@ class CampusNavigationApp:
         if not start or not end:
             return
 
-        if start in self.blocked_nodes or end in self.blocked_nodes:
-            self.path_display.config(state=tk.NORMAL)
-            self.path_display.delete("1.0", tk.END)
-            self.path_display.insert(tk.END, "Start or end node is blocked. No path available.")
-            self.path_display.config(state=tk.DISABLED)
-            return
-
-        # Create a temporary graph without blocked nodes
+        # Remove blocked nodes from the graph
         H = self.G.copy()
         H.remove_nodes_from(self.blocked_nodes)
 
@@ -503,7 +465,7 @@ class CampusNavigationApp:
             paths = self.bfs_algorithm(H, start, end)
             self.display_paths_threaded(paths)
         elif algorithm == "DFS":
-            self.run_dfs_multithreaded(H, start, end)
+            self.dfs_algorithm_threaded(H, start, end)
         elif algorithm == "Dijkstra":
             paths = self.dijkstra_algorithm(H, start, end)
             self.display_paths_threaded(paths)
@@ -543,14 +505,12 @@ class CampusNavigationApp:
                 self.path_display.insert(tk.END, f"Path {idx + 1}: {' -> '.join(path)}\n")
             self.path_display.config(state=tk.DISABLED)
             
+
             # Display total distance and estimated time
             walking_speed = 5  # km/h
             total_time = (total_distance / 1000) / walking_speed * 60  # Convert to minutes
             self.distance_label.config(text=f"Distance: {total_distance:.2f} m")
             self.time_label.config(text=f"Time: {total_time:.2f} minutes")
-            
-            # Draw paths on map
-            self.draw_paths_on_map(paths, colors)
 
 if __name__ == "__main__":
     root = tk.Tk()
