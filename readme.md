@@ -68,4 +68,4 @@ This project is licensed under the GNU General Public License (GPL). The code ca
 
 ## Contact
 If you have any questions, feel free to reach out:
-- **Minjae Kim** - [LinkedIn](https://linkedin.com/in/greysonkim98)
+- **Minjae Kim** - [LinkedIn](https://linkedin.com/in/greyson-kim)
