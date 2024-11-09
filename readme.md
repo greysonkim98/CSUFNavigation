@@ -2,7 +2,8 @@
 
 ![Screenshot 2024-11-05 233554](https://github.com/user-attachments/assets/c931466b-17db-4198-9da1-4d686cc5bbee)
 
-## Live Demo : https://www.linkedin.com/posts/greyson-kim_csuf-csdept-algorithmengineering-activity-7259999102828969984-rvqe?utm_source=share&utm_medium=member_desktop
+## Live Demo
+https://www.linkedin.com/posts/greyson-kim_csuf-csdept-algorithmengineering-activity-7259999102828969984-rvqe?utm_source=share&utm_medium=member_desktop
 
 ## Project Overview
 This project is a campus navigation application for California State University Fullerton (CSUF), developed as part of CPSC 335. The application utilizes three advanced graph algorithms: Breadth First Search (BFS), Depth First Search (DFS), and Dijkstra's Algorithm to help users find optimal routes across campus. The app is built using Python with `tkinter` for the user interface and `networkx` for graph representation.
